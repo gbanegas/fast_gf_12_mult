@@ -1,13 +1,43 @@
-/*
- * gf.c
- *
- *  Created on: Dec 8, 2017
- *      Author: vader
- */
-
 #include "gf.h"
 
-gf gf_multiplication(gf x, gf y) {
+/*
+ ~~~~~~~~ARITHMETIC FIELD ELEMENT CONSTRUCTION ~~~~~~~~~~~~~~~~
+ We define arithmetic field in  F[2][x]/(f), where f is an m-irreducible polynomial.
+ In our case, m=5 or m=6.
+ For multiplication ,inversion,square,exponentiation field elements, we have adopted the "bitsliced-operation" technic.
+ Addition field element, we used XOR between integers.
+ */
+
+// Correct gf_Div
+// Use in poly.c
+gf gf_div(gf a, gf b) {
+	if (b == 0) {
+		fprintf(stderr, "ERROR %d is not invertible", b);
+		exit(-1);
+	} else {
+		gf res = gf_mult(a, gf_inv(b));
+		return res;
+	}
+}
+
+// Correct gf_Pow
+gf gf_pow(gf in, int n) {
+
+	gf h, t;
+	h = 1;
+	t = in;
+	while (n != 0) {
+		if ((n & 1) == 1) {
+			h = gf_mult(h, t);
+		}
+		n = n >> 1;
+		t = gf_mult(t, t);
+	}
+	return h;
+}
+
+// Correct gf_mult
+gf gf_mult(gf x, gf y) {
 	gf a1, b1, a2, b2, a3, b3;
 
 	a1 = x >> gf_extd_sf;
@@ -15,95 +45,57 @@ gf gf_multiplication(gf x, gf y) {
 	a2 = y >> gf_extd_sf;
 	b2 = y & (u_val - 1);
 
-	a3 = gf_mult_fast(gf_mult_fast(a1, a2), primitive_element_in_f_q)
-			^ gf_mult_fast(a1, b2) ^ gf_mult_fast(b1, a2);
+	a3 = gf_mult_fast(gf_mult_fast(a1, a2),
+			36) ^ gf_mult_fast(a1, b2) ^ gf_mult_fast(b1, a2);
 
 	b3 = gf_mult_fast(gf_mult_fast(a1, a2), 2) ^ gf_mult_fast(b1, b2);
 
 	return (a3 << gf_extd_sf) ^ b3;
 }
 
-gf gf_mult_fast(gf in0, gf in1) {
-	uint64_t i, tmp, t0 = in0, t1 = in1;
+// Correct gf_sq
+gf gf_sq(gf x) {
+	gf a1, b1, a3, b3;
 
-	//Multiplication
-	tmp = t0 * (t1 & 1);
+	a1 = x >> gf_extd_sf;
+	b1 = x & (u_val - 1);
 
-	for (i = 1; i < 7; i++)
-		tmp ^= (t0 * (t1 & (1 << i)));
+	a3 = gf_mult_fast(gf_mult_fast(a1, a1), 36);
 
-	//reduction
-	tmp = tmp & 0x7FF; // tmp & 0000 0111 1111 1111
-	tmp = tmp ^ (tmp >> 6);
-	tmp = tmp ^ ((tmp >> 5) & 0x1E);
-	tmp = tmp & 0x3F;
-	return tmp;
+	b3 = gf_mult_fast(gf_mult_fast(a1, a1), 2) ^ gf_mult_fast(b1, b1);
+
+	return (a3 << gf_extd_sf) ^ b3;
 }
-/*t1 = f2 * g2
- t2 = f2 * g0
- t3 = f2 * g1
- t4 = f0 * g2
- t5 = f1 * g2
- t6 = f1 * g1
- t7 = f1 * g0
- t8 = f0 * g1
- t9 = f0 * g0
- t10 = t8 + t7
- t11 = t6 + t4
- t12 = t11 + t2
- t13 = t5 + t3
- t14 = f5 * g5
- t15 = f5 * g3
- t16 = f5 * g4
- t17 = f3 * g5
- t18 = f4 * g5
- t19 = f4 * g4
- t20 = f4 * g3
- t21 = f3 * g4
- t22 = f3 * g3
- t23 = t21 + t20
- t24 = t19 + t17
- t25 = t24 + t15
- t26 = t18 + t16
- t27 = g0 + g3
- t28 = g1 + g4
- t29 = g2 + g5
- t30 = f0 + f3
- t31 = f1 + f4
- t32 = f2 + f5
- t33 = t32 * t29
- t34 = t32 * t27
- t35 = t32 * t28
- t36 = t30 * t29
- t37 = t31 * t29
- t38 = t31 * t28
- t39 = t31 * t27
- t40 = t30 * t28
- t41 = t30 * t27
- t42 = t40 + t39
- t43 = t38 + t36
- t44 = t43 + t34
- t45 = t37 + t35
- t46 = t13 + t22
- t47 = t1 + t23
- t48 = t41 + t46
- t49 = t42 + t47
- t50 = t44 + t25
- t51 = t45 + t26
- t52 = t33 + t14
- t53 = t48 + t9
- t54 = t49 + t10
- t55 = t50 + t12
- t56 = t51 + t46
- t57 = t52 + t47
- h0 = t9
- h1 = t10
- h2 = t12
- h3 = t53
- h4 = t54
- h5 = t55
- h6 = t56
- h7 = t57
- h8 = t25
- h9 = t26
- h10 = t14*/
+
+// Correct gf_Inv
+gf gf_inv(gf in) {
+	gf tmp_11;
+	gf tmp_1111;
+
+	gf out = in;
+	out = gf_sq(out); //a^2
+	tmp_11 = gf_mult(out, in); //a^2*a = a^3
+
+	out = gf_sq(tmp_11); //(a^3)^2 = a^6
+	out = gf_sq(out); // (a^6)^2 = a^12
+	tmp_1111 = gf_mult(out, tmp_11); //a^12*a^3 = a^15
+
+	out = gf_sq(tmp_1111); //(a^15)^2 = a^30
+	out = gf_sq(out); //(a^30)^2 = a^60
+	out = gf_sq(out); //(a^60)^2 = a^120
+	out = gf_sq(out); //(a^120)^2 = a^240
+	out = gf_mult(out, tmp_1111); //a^240*a^15 = a^255
+
+	out = gf_sq(out); // (a^255)^2 = 510
+	out = gf_sq(out); //(a^510)^2 =  1020
+	out = gf_mult(out, tmp_11); //a^1020*a^3 = 1023
+
+	out = gf_sq(out); //(a^1023)^2 = 2046
+	out = gf_mult(out, in); //a^2046*a = 2047
+	//gf t = gf_sq(out); //(a^2047)^2 = 4094
+	/*
+	 gf tmp = gf_pow(in, 4094);
+	 //gf tmp = gf_pow(in, 4094);*/
+	return gf_sq(out);
+}
+
