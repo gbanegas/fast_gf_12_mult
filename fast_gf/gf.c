@@ -45,12 +45,16 @@ gf gf_mult(gf x, gf y) {
 	a2 = y >> gf_extd_sf;
 	b2 = y & (u_val - 1);
 
-	a3 = gf_mult_fast(gf_mult_fast(a1, a2),
-			36) ^ gf_mult_fast(a1, b2) ^ gf_mult_fast(b1, a2);
+	gf tmp = gf_mult_fast(a1, a2);
+	gf result_1 = gf_mult_fast(a1, b2);
+	gf result =  gf_mult_fast(b1, a2);
+	a3 = gf_mult_fast(tmp, 36) ^ result ^ result_1;
 
-	b3 = gf_mult_fast(gf_mult_fast(a1, a2), 2) ^ gf_mult_fast(b1, b2);
+	b3 = gf_mult_fast(tmp, 2) ^ gf_mult_fast(b1, b2);
 
-	return (a3 << gf_extd_sf) ^ b3;
+	gf tmp_1 = (a3 << gf_extd_sf) ^ b3;
+
+	return tmp_1;
 }
 
 // Correct gf_sq

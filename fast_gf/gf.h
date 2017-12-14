@@ -16,6 +16,7 @@
 #include "gf_tables.h"
 #include "types_def.h"
 #include "param.h"
+#include "gf_6.h"
 
 //int gf_extension_degree, gf_cardinality, gf_multiplicative_order;
 
